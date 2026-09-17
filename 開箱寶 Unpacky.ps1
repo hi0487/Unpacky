@@ -1,5 +1,5 @@
 ﻿# ============================================
-#  開箱寶 Unpacky.ps1 - 拖放式批量密碼解壓工具 V2
+#  開箱寶 Unpacky.ps1 - 拖放式批量密碼解壓工具 V3
 #  - 把壓縮包拖進視窗（或按「新增檔案」）
 #  - 輸入 / 載入密碼本（一行一個密碼）
 #  - 自動逐個試密碼，解壓到指定位置
@@ -28,7 +28,7 @@ Add-Type -AssemblyName System.Drawing
 $script:Lang = 'zh'
 $script:UI = @{
     zh = @{
-        title = '開箱寶 Unpacky V2'
+        title = '開箱寶 Unpacky V3'
         menuLang = 'Language語言'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
@@ -97,10 +97,11 @@ $script:UI = @{
         disclaimerTitle = '免責聲明'
         disclaimer = "本軟體免費且開源。如果有人向你收費，請拒絕付款；已付款請申請退款，並前往 GitHub 下載最新官方版本。`r`n`r`n本軟體僅供個人使用，用於學習 PowerShell 程式設計與自動化解壓縮。請勿用於任何營利或商業用途。`r`n`r`n請僅使用於你擁有合法權限解壓的檔案，尊重檔案所有人的權益。"
         aboutOk = '知道了'
-        aboutVersion = '目前版本：V2'
+        aboutVersion = '目前版本：V3'
+        aboutGithub = 'GitHub 下載'
     }
     zhcn = @{
-        title = '开箱宝 Unpacky V2'
+        title = '开箱宝 Unpacky V3'
         menuLang = 'Language语言'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
@@ -169,10 +170,11 @@ $script:UI = @{
         disclaimerTitle = '免责声明'
         disclaimer = "本软件免费且开源。如果有人向你收费，请拒绝付款；已付款请申请退款，并前往 GitHub 下载最新官方版本。`r`n`r`n本软件仅供个人使用，用于学习 PowerShell 程序设计及自动化解压缩。请勿用于任何营利或商业用途。`r`n`r`n请仅用于你拥有合法权限解压的文件，尊重文件所有者的权益。"
         aboutOk = '知道了'
-        aboutVersion = '目前版本：V2'
+        aboutVersion = '目前版本：V3'
+        aboutGithub = 'GitHub 下载'
     }
     en = @{
-        title = 'Unpacky V2'
+        title = 'Unpacky V3'
         menuLang = 'Language'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
@@ -241,7 +243,8 @@ $script:UI = @{
         disclaimerTitle = 'Disclaimer'
         disclaimer = "This software is free and open source. If anyone charges you for it, refuse to pay; if you already paid, request a refund, and download the latest official version from GitHub.`r`n`r`nThis software is for personal use only, for learning PowerShell scripting and automated archive extraction. Do not use it for any commercial or profit-making purpose.`r`n`r`nUse it only on archives you have the legal right to extract, and respect the rights of the archive owners."
         aboutOk = 'OK'
-        aboutVersion = 'Current version: V2'
+        aboutVersion = 'Current version: V3'
+        aboutGithub = 'GitHub Download'
     }
 }
 
@@ -422,7 +425,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
         $u = $script:UI[$script:Lang]
         $ab = New-Object System.Windows.Forms.Form
         $ab.Text = $u['aboutTitle']
-        $ab.Size = New-Object System.Drawing.Size(470, 430)
+        $ab.Size = New-Object System.Drawing.Size(560, 430)
         $ab.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
         $ab.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
         $ab.MaximizeBox = $false
@@ -430,47 +433,59 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
         $ab.ShowInTaskbar = $false
         if (Test-Path -LiteralPath $iconPath) { try { $ab.Icon = New-Object System.Drawing.Icon($iconPath) } catch {} }
         $lTitle = New-Object System.Windows.Forms.Label
-        $lTitle.SetBounds(20, 16, 420, 30)
+        $lTitle.SetBounds(20, 16, 510, 30)
         $lTitle.Text = '開箱寶 Unpacky'
         $lTitle.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 14, [System.Drawing.FontStyle]::Bold)
         $lAuthor = New-Object System.Windows.Forms.Label
-        $lAuthor.SetBounds(20, 54, 420, 24)
+        $lAuthor.SetBounds(20, 54, 510, 24)
         $lAuthor.Text = $u['aboutAuthor']
         $lLink = New-Object System.Windows.Forms.LinkLabel
-        $lLink.SetBounds(20, 82, 420, 24)
+        $lLink.SetBounds(20, 82, 510, 24)
         $lLink.Text = $u['aboutLink']
         $lLink.Add_LinkClicked({
             param($s, $e)
             try { [System.Diagnostics.Process]::Start($u['aboutLink']) } catch {}
         })
         $lAsk = New-Object System.Windows.Forms.Label
-        $lAsk.SetBounds(20, 110, 420, 24)
+        $lAsk.SetBounds(20, 110, 510, 24)
         $lAsk.Text = $u['aboutAsk']
         $lSep = New-Object System.Windows.Forms.Label
-        $lSep.SetBounds(20, 142, 420, 2)
+        $lSep.SetBounds(20, 142, 510, 2)
         $lSep.BorderStyle = [System.Windows.Forms.BorderStyle]::Fixed3D
         $lDTitle = New-Object System.Windows.Forms.Label
-        $lDTitle.SetBounds(20, 152, 420, 22)
+        $lDTitle.SetBounds(20, 152, 510, 22)
         $lDTitle.Text = $u['disclaimerTitle']
         $lDTitle.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 10, [System.Drawing.FontStyle]::Bold)
         $dBox = New-Object System.Windows.Forms.TextBox
         $dBox.Multiline = $true
         $dBox.ReadOnly = $true
         $dBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
-        $dBox.SetBounds(20, 178, 420, 160)
+        $dBox.SetBounds(20, 178, 510, 160)
         $dBox.Text = $u['disclaimer']
         $dBox.BackColor = [System.Drawing.SystemColors]::Control
         $dBox.BorderStyle = [System.Windows.Forms.BorderStyle]::None
         $btnOk = New-Object System.Windows.Forms.Button
-        $btnOk.SetBounds(330, 350, 110, 32)
+        $btnOk.SetBounds(450, 350, 90, 32)
         $btnOk.Text = $u['aboutOk']
         $btnOk.Add_Click({ $ab.Close() })
         $lVer = New-Object System.Windows.Forms.Label
-        $lVer.SetBounds(20, 356, 290, 22)
+        $lVer.SetBounds(20, 356, 280, 22)
         $lVer.Text = $u['aboutVersion']
         $lVer.ForeColor = [System.Drawing.Color]::Gray
         $lVer.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 9)
-        $ab.Controls.AddRange(@($lTitle, $lAuthor, $lLink, $lAsk, $lSep, $lDTitle, $dBox, $lVer, $btnOk))
+        $btnGithub = New-Object System.Windows.Forms.Button
+        $btnGithub.SetBounds(310, 350, 130, 32)
+        $btnGithub.Text = $u['aboutGithub']
+        $btnGithub.BackColor = [System.Drawing.Color]::FromArgb(34, 139, 34)
+        $btnGithub.ForeColor = [System.Drawing.Color]::White
+        $btnGithub.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 10, [System.Drawing.FontStyle]::Bold)
+        $btnGithub.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+        $btnGithub.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(20, 90, 20)
+        $btnGithub.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $btnGithub.Add_Click({
+            try { [System.Diagnostics.Process]::Start('https://github.com/hi0487/Unpacky') } catch {}
+        })
+        $ab.Controls.AddRange(@($lTitle, $lAuthor, $lLink, $lAsk, $lSep, $lDTitle, $dBox, $lVer, $btnGithub, $btnOk))
         [void]$ab.ShowDialog()
     }
 
