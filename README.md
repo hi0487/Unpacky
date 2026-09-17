@@ -12,6 +12,8 @@
 - **即時進度條、可隨時取消**
 - **一鍵補上副檔名**：完全沒有副檔名的壓縮包，可一鍵改為 .7z
 - **介面語言切換**：繁體中文 / 简体中文 / English（左上角 Language語言 選單，自動記憶）
+<img width="686" height="783" alt="螢幕擷取畫面 2026-09-17 114822" src="https://github.com/user-attachments/assets/b515f6f9-ab33-4965-abdb-1b03a9a37032" />
+<img width="686" height="783" alt="螢幕擷取畫面 2026-09-17 114803" src="https://github.com/user-attachments/assets/ad7cff23-e81f-4ab2-b16b-63bbecaa6f99" />
 
 ## 使用方法
 1. 下載最新版 zip，解壓到任意資料夾
