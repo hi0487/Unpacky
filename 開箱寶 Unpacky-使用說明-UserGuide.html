@@ -1,0 +1,213 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>開箱寶 Unpacky 使用說明</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='14' width='52' height='42' rx='9' fill='%23E8862E'/%3E%3Crect x='6' y='14' width='52' height='16' rx='9' fill='%23C4641B'/%3E%3Crect x='20' y='6' width='24' height='12' rx='4' fill='%23E8A33D'/%3E%3Ccircle cx='32' cy='36' r='9' fill='%23FFF3E0'/%3E%3Ccircle cx='29' cy='36' r='2' fill='%234A3421'/%3E%3Ccircle cx='35' cy='36' r='2' fill='%234A3421'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#FDF6EC; --card:#FFFFFF; --line:#EFD9BC;
+    --ink:#4A3421; --sub:#8A6E52; --orange:#E8862E; --deep:#C4641B;
+    --gold:#E8A33D; --green:#3E9B4F; --red:#D64545;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC","Segoe UI",sans-serif;
+    line-height:1.7; padding:0 16px 40px;
+  }
+  .wrap{max-width:760px; margin:0 auto;}
+  /* hero */
+  header{
+    text-align:center; padding:44px 0 30px;
+  }
+  header img{width:132px; height:132px; display:block; margin:0 auto 14px; filter:drop-shadow(0 6px 14px rgba(196,100,27,.28));}
+  h1{font-size:34px; font-weight:800; letter-spacing:1px;}
+  .tagline{color:var(--sub); font-size:15px; margin-top:4px;}
+  .ver{
+    display:inline-block; margin-top:12px; padding:3px 14px; border-radius:999px;
+    background:#FFF; border:2px dashed var(--gold); color:var(--deep);
+    font-size:13px; font-weight:700;
+  }
+  /* section */
+  section{margin-top:34px;}
+  h2{
+    font-size:19px; font-weight:800; display:flex; align-items:center; gap:9px;
+    margin-bottom:14px;
+  }
+  h2::before{
+    content:""; width:8px; height:20px; border-radius:4px; background:var(--orange); display:inline-block;
+  }
+  .card{background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:16px 18px;}
+  /* steps */
+  .steps{display:flex; flex-direction:column; gap:10px;}
+  .step{display:flex; gap:14px; align-items:flex-start;}
+  .num{
+    flex:none; width:30px; height:30px; border-radius:50%;
+    background:var(--orange); color:#FFF; font-weight:800; font-size:15px;
+    display:flex; align-items:center; justify-content:center; margin-top:3px;
+    box-shadow:0 3px 0 var(--deep);
+  }
+  .step b{color:var(--deep);}
+  .step p{font-size:14.5px;}
+  /* options */
+  .opts{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
+  .opt{border:1.5px solid var(--line); border-radius:14px; background:var(--card); padding:14px; text-align:center;}
+  .opt .t{font-weight:800; font-size:15px; color:var(--deep); margin-bottom:6px;}
+  .opt .d{font-size:12.5px; color:var(--sub);}
+  .tag{
+    display:inline-block; font-size:11px; font-weight:800; color:#FFF;
+    border-radius:6px; padding:1px 7px; margin-left:4px; vertical-align:2px;
+  }
+  .t1{background:var(--orange);} .t2{background:var(--gold);} .t3{background:var(--green);}
+  /* buttons */
+  .btns{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .btn{display:flex; gap:10px; align-items:flex-start; background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:12px 14px;}
+  .btn .ic{flex:none; width:26px; height:26px;}
+  .btn b{font-size:14px; color:var(--deep); display:block;}
+  .btn span{font-size:12.5px; color:var(--sub);}
+  .go{
+    background:#37A05B; border-color:#2E7D46; color:#FFF; border-radius:8px;
+    font-size:14px; font-weight:800; padding:8px 18px; display:inline-block; box-shadow:0 3px 0 #2E7D46;
+  }
+  /* tips */
+  .tip{border:1.5px dashed var(--gold); background:#FFFBF0; border-radius:14px; padding:14px 18px; font-size:14px;}
+  .tip b{color:var(--deep);}
+  .tip code{background:#F4E8D6; border-radius:5px; padding:1px 7px; font-size:13px; color:var(--deep);}
+  /* faq */
+  details{margin-bottom:10px;}
+  summary{
+    cursor:pointer; list-style:none; background:var(--card); border:1.5px solid var(--line);
+    border-radius:12px; padding:13px 16px; font-weight:700; font-size:14.5px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  summary::after{content:"+"; font-size:18px; color:var(--orange); font-weight:800;}
+  details[open] summary::after{content:"–";}
+  details[open] summary{border-bottom-left-radius:0; border-bottom-right-radius:0;}
+  .faq-a{background:var(--card); border:1.5px solid var(--line); border-top:none; border-radius:0 0 12px 12px; padding:12px 16px; font-size:14px; color:var(--ink);}
+  .ok{color:var(--green); font-weight:800;}
+  .no{color:var(--red); font-weight:800;}
+  /* table */
+  table{width:100%; border-collapse:collapse; font-size:13.5px; table-layout:fixed;}
+  th,td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); word-break:break-all;}
+  th{background:#FBF1E1; font-weight:800; color:var(--deep);}
+  tr:last-child td{border-bottom:none;}
+  /* footer */
+  footer{margin-top:44px; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:18px; text-align:center; font-size:13px; color:var(--sub);}
+  footer .who{font-weight:800; color:var(--deep); font-size:14px;}
+  footer a{color:var(--orange); font-weight:700; text-decoration:none;}
+  footer a:hover{text-decoration:underline;}
+  footer .disc{margin-top:8px; font-size:12px; color:var(--sub);}
+  footer .v{margin-top:8px; display:inline-block; font-size:12px; color:#FFF; background:var(--orange); border-radius:999px; padding:2px 12px; font-weight:700;}
+  @media (max-width:600px){
+    h1{font-size:28px;}
+    .opts{grid-template-columns:1fr;}
+    .btns{grid-template-columns:1fr;}
+    header img{width:110px; height:110px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="assets/開箱寶 Unpacky-圖示.png" alt="開箱寶 Unpacky 圖示">
+    <h1>開箱寶 Unpacky</h1>
+    <div class="tagline">把壓縮包拖進視窗，自動一個一個試密碼幫你解壓縮</div>
+    <div class="ver">目前版本 V2</div>
+  </header>
+
+  <section>
+    <h2>快速開始</h2>
+    <div class="card">
+      <div class="steps">
+        <div class="step"><div class="num">1</div><p>雙擊 <b>開箱寶 Unpacky.exe</b> 開啟程式。想放桌面，先雙擊一次「建立捷徑.vbs」。</p></div>
+        <div class="step"><div class="num">2</div><p>把壓縮包拖進視窗<b>任何位置</b>，一次可以拖很多個。</p></div>
+        <div class="step"><div class="num">3</div><p>確認密碼本：左邊「密碼本」區域已經有密碼（也可以直接把 <code>.txt</code> 密碼本拖進視窗自動載入）。</p></div>
+        <div class="step"><div class="num">4</div><p>選一個解壓位置（見下方三種方式）。</p></div>
+        <div class="step"><div class="num">5</div><p>按下綠色的 <span class="go">開始解壓</span> 大按鈕。</p></div>
+        <div class="step"><div class="num">6</div><p>看「執行紀錄」與右側「各檔狀態」：<span class="ok">✔ 完成</span> 是成功、<span class="no">✘ 失敗</span> 是密碼都不對。全部處理完會出現 ✔ 完成！</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>三種解壓位置</h2>
+    <div class="opts">
+      <div class="opt"><div class="t">目前資料夾 <span class="tag t1">1</span></div><div class="d">解到壓縮檔所在的那個資料夾</div></div>
+      <div class="opt"><div class="t">個別檔名資料夾 <span class="tag t2">2</span></div><div class="d">每個壓縮包解到「跟檔名一樣」的資料夾</div></div>
+      <div class="opt"><div class="t">個別資料夾＋刪除 <span class="tag t3">3</span></div><div class="d">同第 2 種，但解完自動刪掉原壓縮包</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>按鈕一覽</h2>
+    <div class="btns">
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><div><b>新增檔案…</b><span>用視窗選檔加入清單</span></div></div>
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div><div><b>移除選中</b><span>把清單裡選到的檔移掉</span></div></div>
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></div><div><b>清空清單</b><span>把待解壓清單全部清掉</span></div></div>
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><path d="M14 3v4a2 2 0 0 0 2 2h4M14 3l6 6M5 13l6 6M11 19l6-6-2-2-6 6zM3 21l2-2"/></svg></div><div><b>副檔名改為 .7z</b><span>幫「沒有副檔名」或「怪副檔名」的壓縮包補上 .7z</span></div></div>
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div><b>取消</b><span>解壓中隨時按，立刻中止</span></div></div>
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><path d="M12 3v12M5 10l7 7 7-7M5 21h14"/></svg></div><div><b>Language語言</b><span>切換 繁體中文 / 简体中文 / English，會自動記住</span></div></div>
+      <div class="btn"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C4641B" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg></div><div><b>? 關於</b><span>作者資訊、Dcard 文章連結、免責聲明</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>密碼本</h2>
+    <div class="tip">
+      <p>檔名固定是 <code>密碼本.txt</code>，放在程式資料夾裡，<b>一行一個密碼</b>，中英文都可以：</p>
+      <p style="margin-top:8px"><code>123456</code><br><code>mypassword</code><br><code>我的密碼</code></p>
+      <p style="margin-top:8px">關閉視窗時會自動儲存，下次開啟自動載入。密碼不對會自動試下一個，全部不對才顯示 <span class="no">✘ 失敗</span>。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>常見問題</h2>
+    <details>
+      <summary>解壓中關不掉視窗？</summary>
+      <div class="faq-a">按「取消」或直接關閉視窗，都會立刻中止目前解壓並關閉。</div>
+    </details>
+    <details>
+      <summary>換電腦要帶什麼？</summary>
+      <div class="faq-a">把整個資料夾複製到新電腦就能用，不用安裝任何東西（自用版已含密碼本）。</div>
+    </details>
+    <details>
+      <summary>顯示「找不到 7z.exe」？</summary>
+      <div class="faq-a">確認 <code>7z.exe</code>、<code>7z.dll</code> 和主程式放在同一個資料夾，這三個檔請不要改名。</div>
+    </details>
+    <details>
+      <summary>檔名沒有副檔名或怪副檔名？</summary>
+      <div class="faq-a">選中後按「副檔名改為 .7z」補上副檔名再解壓。已有 .zip / .7z / .rar 的檔案不會被誤改。</div>
+    </details>
+  </section>
+
+  <section>
+    <h2>檔案清單</h2>
+    <div class="card">
+      <table>
+        <colgroup><col style="width:42%"><col style="width:58%"></colgroup>
+        <tr><th>檔案</th><th>用途</th></tr>
+        <tr><td>開箱寶 Unpacky.exe</td><td>啟動器（雙擊這個開啟）</td></tr>
+        <tr><td>開箱寶 Unpacky.ps1</td><td>主程式</td></tr>
+        <tr><td>開箱寶 Unpacky.ico</td><td>程式圖示</td></tr>
+        <tr><td>開箱寶 Unpacky-設定.txt</td><td>語言設定（自動產生）</td></tr>
+        <tr><td>開箱寶 Unpacky-log.txt</td><td>執行紀錄（自動產生）</td></tr>
+        <tr><td>7z.exe / 7z.dll / Codecs</td><td>解壓引擎（免安裝，請勿改名）</td></tr>
+        <tr><td>密碼本.txt</td><td>你的密碼</td></tr>
+        <tr><td>建立捷徑.vbs</td><td>建立桌面捷徑</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div class="who">作者：負債三千萬-小殭屍 @hi99978（Dcard 論壇）</div>
+    <div>有問題可以到文章留言問我：<a href="https://www.dcard.tw/@hi99978">https://www.dcard.tw/@hi99978</a></div>
+    <div class="disc">本軟體免費且開源。如果有人向你收費，請拒絕付款，並到 GitHub 下載最新官方版本。<br>僅供個人使用、學習 PowerShell 程式設計；請勿用於任何營利或商業用途。</div>
+    <div class="v">開箱寶 Unpacky · 目前版本 V2</div>
+  </footer>
+
+</div>
+</body>
+</html>
