@@ -1,5 +1,5 @@
 ﻿# ============================================
-#  開箱寶 Unpacky.ps1 - 拖放式批量密碼解壓工具 V3
+#  開箱寶 Unpacky.ps1 - 拖放式批量密碼解壓工具 V4
 #  - 把壓縮包拖進視窗（或按「新增檔案」）
 #  - 輸入 / 載入密碼本（一行一個密碼）
 #  - 自動逐個試密碼，解壓到指定位置
@@ -28,11 +28,14 @@ Add-Type -AssemblyName System.Drawing
 $script:Lang = 'zh'
 $script:UI = @{
     zh = @{
-        title = '開箱寶 Unpacky V3'
+        title = '開箱寶 Unpacky V4'
         menuLang = 'Language語言'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
         menuEn = 'English'
+        pin = '置頂'
+        pinOn = '置頂：開'
+        pinOff = '置頂：關'
         aboutBtn = '? 關於'
         drop = "把壓縮包或密碼本拖到視窗任何位置即可`r`n`r`n支援 .zip / .7z / .rar 及 .txt 密碼本（可多個）"
         listLabel = '待解壓清單：'
@@ -43,6 +46,7 @@ $script:UI = @{
         pwLabel = '密碼本（一行一個密碼，中英文都可以）：'
         btnLoadPw = '載入密碼本...'
         btnSavePw = '保存密碼本'
+        btnOpenPw = '開啟密碼本位置'
         radioLabel = '解壓位置：'
         radio1 = '目前資料夾'
         radio2 = '個別檔名資料夾'
@@ -97,15 +101,18 @@ $script:UI = @{
         disclaimerTitle = '免責聲明'
         disclaimer = "本軟體免費且開源。如果有人向你收費，請拒絕付款；已付款請申請退款，並前往 GitHub 下載最新官方版本。`r`n`r`n本軟體僅供個人使用，用於學習 PowerShell 程式設計與自動化解壓縮。請勿用於任何營利或商業用途。`r`n`r`n請僅使用於你擁有合法權限解壓的檔案，尊重檔案所有人的權益。"
         aboutOk = '知道了'
-        aboutVersion = '目前版本：V3'
+        aboutVersion = '目前版本：V4'
         aboutGithub = 'GitHub 下載'
     }
     zhcn = @{
-        title = '开箱宝 Unpacky V3'
+        title = '开箱宝 Unpacky V4'
         menuLang = 'Language语言'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
         menuEn = 'English'
+        pin = '置顶'
+        pinOn = '置顶：开'
+        pinOff = '置顶：关'
         aboutBtn = '? 关于'
         drop = "把压缩包或密码本拖到窗口任何位置即可`r`n`r`n支持 .zip / .7z / .rar 及 .txt 密码本（可多个）"
         listLabel = '待解压清单：'
@@ -116,6 +123,7 @@ $script:UI = @{
         pwLabel = '密码本（一行一个密码，中英文都可以）：'
         btnLoadPw = '载入密码本...'
         btnSavePw = '保存密码本'
+        btnOpenPw = '打开密码本位置'
         radioLabel = '解压位置：'
         radio1 = '目前文件夹'
         radio2 = '个别文件名文件夹'
@@ -170,15 +178,18 @@ $script:UI = @{
         disclaimerTitle = '免责声明'
         disclaimer = "本软件免费且开源。如果有人向你收费，请拒绝付款；已付款请申请退款，并前往 GitHub 下载最新官方版本。`r`n`r`n本软件仅供个人使用，用于学习 PowerShell 程序设计及自动化解压缩。请勿用于任何营利或商业用途。`r`n`r`n请仅用于你拥有合法权限解压的文件，尊重文件所有者的权益。"
         aboutOk = '知道了'
-        aboutVersion = '目前版本：V3'
+        aboutVersion = '目前版本：V4'
         aboutGithub = 'GitHub 下载'
     }
     en = @{
-        title = 'Unpacky V3'
+        title = 'Unpacky V4'
         menuLang = 'Language'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
         menuEn = 'English'
+        pin = 'Pin on Top'
+        pinOn = 'Pin: ON'
+        pinOff = 'Pin: OFF'
         aboutBtn = '? About'
         drop = "Drag archives or a password list anywhere into this window`r`n`r`nSupports .zip / .7z / .rar and .txt password lists (multiple)"
         listLabel = 'Queue:'
@@ -189,6 +200,7 @@ $script:UI = @{
         pwLabel = 'Passwords (one per line, Chinese/English OK):'
         btnLoadPw = 'Load Password List...'
         btnSavePw = 'Save Passwords'
+        btnOpenPw = 'Open Password Folder'
         radioLabel = 'Extract to:'
         radio1 = 'Current Folder'
         radio2 = 'Subfolder'
@@ -243,7 +255,7 @@ $script:UI = @{
         disclaimerTitle = 'Disclaimer'
         disclaimer = "This software is free and open source. If anyone charges you for it, refuse to pay; if you already paid, request a refund, and download the latest official version from GitHub.`r`n`r`nThis software is for personal use only, for learning PowerShell scripting and automated archive extraction. Do not use it for any commercial or profit-making purpose.`r`n`r`nUse it only on archives you have the legal right to extract, and respect the rights of the archive owners."
         aboutOk = 'OK'
-        aboutVersion = 'Current version: V3'
+        aboutVersion = 'Current version: V4'
         aboutGithub = 'GitHub Download'
     }
 }
@@ -268,6 +280,8 @@ try {
     $script:archiveList = New-Object System.Collections.Generic.List[string]
     $script:currentProc = $null
     $script:cancelRequested = $false
+    $script:topMost = $false
+    $script:lastPwFile = $null
 
     # --- 讀檔（允許並行寫入）---
     function Read-TextShared([string]$path) {
@@ -286,6 +300,7 @@ try {
         catch { $text = [Text.Encoding]::Default.GetString($bytes) }
         $text = $text.TrimStart([char]0xFEFF)
         $script:pwBox.Text = $text
+        $script:lastPwFile = [IO.Path]::GetFullPath($path)
         $script:statusLabel.Text = TR('loadedPw')
     }
 
@@ -296,16 +311,27 @@ try {
         if ($has.Count -eq 0) { $script:pwChanged = $false; return }
         try {
             [IO.File]::WriteAllText((Join-Path $PSScriptRoot '密碼本.txt'), $script:pwBox.Text, (New-Object System.Text.UTF8Encoding($true)))
+            $script:lastPwFile = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '密碼本.txt'))
             $script:pwChanged = $false
         } catch {}
     }
 
-    # --- 加入壓縮檔（檔案或資料夾；任何副檔名都收，.txt 除外）---
+    # --- 加入壓縮檔（檔案或資料夾；資料夾會遞迴掃描所有子資料夾）---
+    # 聰明過濾：常見壓縮副檔名、沒有副檔名、副檔名含非英數字元（如中文怪字）、
+    # 尾綴數字的變體（如 .7z1/.zip1）或分割檔（.r00/.z01/.001/.002）才加入；.txt 一律跳過
     function Add-Archive([string]$path) {
         if (Test-Path -LiteralPath $path -PathType Container) {
-            Get-ChildItem -LiteralPath $path -File | Where-Object { $_.Extension.ToLower() -ne '.txt' } | ForEach-Object {
-                $script:archiveList.Add($_.FullName)
-                [void]$script:listBox.Items.Add($_.Name)
+            $root = [IO.Path]::GetFullPath($path).TrimEnd('\')
+            $knownExt = @('.zip', '.7z', '.rar', '.001', '.tar', '.gz', '.bz2', '.xz', '.iso', '.lzma', '.tgz', '.tbz2')
+            Get-ChildItem -LiteralPath $path -File -Recurse | ForEach-Object {
+                $ext = $_.Extension.ToLower()
+                if ($ext -eq '.txt') { return }
+                if ($knownExt -contains $ext -or $ext -eq '' -or $ext -match '[^\x00-\x7F]' -or $ext -match '^\.(7z|zip|rar|tar|gz|bz2|xz|iso|lzma|tgz|tbz2)\d*$' -or $ext -match '^\.(r\d{2}|z\d{2}|\d{3})$') {
+                    $script:archiveList.Add($_.FullName)
+                    $rel = $_.FullName.Substring($root.Length).TrimStart('\')
+                    if ($rel.Contains('\')) { [void]$script:listBox.Items.Add($rel) }
+                    else { [void]$script:listBox.Items.Add($_.Name) }
+                }
             }
         } else {
             $script:archiveList.Add([IO.Path]::GetFullPath($path))
@@ -392,6 +418,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
             $form.Text = $u['title']
             $langItem.Text = $u['menuLang']
             $aboutItem.Text = $u['aboutBtn']
+            $topItem.Text = if ($script:topMost) { $u['pinOn'] } else { $u['pin'] }
             $dropLabel.Text = $u['drop']
             $listLabel.Text = $u['listLabel']
             $btnAdd.Text = $u['btnAdd']
@@ -400,6 +427,8 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
             $btnFixExt.Text = $u['btnFixExt']
             $pwLabel.Text = $u['pwLabel']
             $btnLoadPw.Text = $u['btnLoadPw']
+            $btnSavePw.Text = $u['btnSavePw']
+            $btnOpenPw.Text = $u['btnOpenPw']
             $radioLabel.Text = $u['radioLabel']
             $radio1.Text = $u['radio1']
             $radio2.Text = $u['radio2']
@@ -511,12 +540,21 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
     $aboutItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $aboutItem.Text = TR('aboutBtn')
     $aboutItem.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
+    $topItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $topItem.Text = TR('pin')
+    $topItem.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
     $menu.Items.Add($langItem) | Out-Null
     $menu.Items.Add($aboutItem) | Out-Null
+    $menu.Items.Add($topItem) | Out-Null
     $mZh.Add_Click({ Set-Language 'zh' })
     $mZhcn.Add_Click({ Set-Language 'zhcn' })
     $mEn.Add_Click({ Set-Language 'en' })
     $aboutItem.Add_Click({ Show-About })
+    $topItem.Add_Click({
+        $script:topMost = -not $script:topMost
+        $form.TopMost = $script:topMost
+        try { $topItem.Text = if ($script:topMost) { TR('pinOn') } else { TR('pin') } } catch {}
+    })
 
     # 選單按鈕加細黑框（Language / ? 關於）
     $menuBorder = {
@@ -527,6 +565,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
     }
     $langItem.Add_Paint($menuBorder)
     $aboutItem.Add_Paint($menuBorder)
+    $topItem.Add_Paint($menuBorder)
 
     # --- 拖放區（柔和虛線框）---
     $dropPanel = New-Object System.Windows.Forms.Panel
@@ -600,7 +639,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
 
     # --- 密碼本 ---
     $pwLabel = New-Object System.Windows.Forms.Label
-    $pwLabel.SetBounds(10, 358, 400, 20)
+    $pwLabel.SetBounds(10, 358, 290, 20)
     $pwLabel.Text = TR('pwLabel')
     $pwLabel.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 10, [System.Drawing.FontStyle]::Bold)
 
@@ -612,7 +651,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
     $pwBox.Add_TextChanged({ $script:pwChanged = $true })
 
     $btnLoadPw = New-Object System.Windows.Forms.Button
-    $btnLoadPw.SetBounds(430, 353, 112, 26)
+    $btnLoadPw.SetBounds(310, 353, 105, 26)
     $btnLoadPw.Text = TR('btnLoadPw')
     $btnLoadPw.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $btnLoadPw.FlatAppearance.BorderSize = 1
@@ -622,7 +661,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
     $btnLoadPw.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 9.5, [System.Drawing.FontStyle]::Bold)
 
     $btnSavePw = New-Object System.Windows.Forms.Button
-    $btnSavePw.SetBounds(548, 353, 122, 26)
+    $btnSavePw.SetBounds(421, 353, 105, 26)
     $btnSavePw.Text = TR('btnSavePw')
     $btnSavePw.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $btnSavePw.FlatAppearance.BorderSize = 1
@@ -635,23 +674,41 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
         $script:statusLabel.Text = TR('savedPw')
     })
 
+    $btnOpenPw = New-Object System.Windows.Forms.Button
+    $btnOpenPw.SetBounds(532, 353, 128, 26)
+    $btnOpenPw.Text = TR('btnOpenPw')
+    $btnOpenPw.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $btnOpenPw.FlatAppearance.BorderSize = 1
+    $btnOpenPw.FlatAppearance.BorderColor = [System.Drawing.Color]::Black
+    $btnOpenPw.BackColor = [System.Drawing.Color]::FromArgb(255, 247, 224)
+    $btnOpenPw.ForeColor = [System.Drawing.Color]::FromArgb(150, 105, 30)
+    $btnOpenPw.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 9.5, [System.Drawing.FontStyle]::Bold)
+    $btnOpenPw.Add_Click({
+        $target = $script:lastPwFile
+        if ($target -and (Test-Path -LiteralPath $target)) {
+            try { [System.Diagnostics.Process]::Start('explorer.exe', ('/select,"' + $target + '"')) } catch {}
+        } else {
+            try { [System.Diagnostics.Process]::Start('explorer.exe', ('"' + $PSScriptRoot + '"')) } catch {}
+        }
+    })
+
     # --- 解壓位置 ---
     $radioLabel = New-Object System.Windows.Forms.Label
-    $radioLabel.SetBounds(10, 466, 110, 24)
+    $radioLabel.SetBounds(10, 466, 100, 24)
     $radioLabel.Text = TR('radioLabel')
     $radioLabel.Font = New-Object System.Drawing.Font('Microsoft JhengHei', 10, [System.Drawing.FontStyle]::Bold)
 
     $radio1 = New-Object System.Windows.Forms.RadioButton
-    $radio1.SetBounds(118, 466, 135, 24)
+    $radio1.SetBounds(114, 466, 102, 24)
     $radio1.Text = TR('radio1')
     $radio1.Checked = $true
 
     $radio2 = New-Object System.Windows.Forms.RadioButton
-    $radio2.SetBounds(260, 466, 155, 24)
+    $radio2.SetBounds(222, 466, 132, 24)
     $radio2.Text = TR('radio2')
 
     $radio3 = New-Object System.Windows.Forms.RadioButton
-    $radio3.SetBounds(420, 466, 250, 24)
+    $radio3.SetBounds(360, 466, 290, 24)
     $radio3.Text = TR('radio3')
 
     # --- 提示 ---
@@ -728,6 +785,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
     $form.Controls.Add($pwBox)
     $form.Controls.Add($btnLoadPw)
     $form.Controls.Add($btnSavePw)
+    $form.Controls.Add($btnOpenPw)
     $form.Controls.Add($radioLabel)
     $form.Controls.Add($radio1)
     $form.Controls.Add($radio2)
@@ -881,9 +939,9 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
 
         try {
             $total = $script:archiveList.Count
-            $displayOverall = 0.0
             $startTime = [DateTime]::UtcNow
             $i = 0
+            $done = 0
             while ($i -lt $script:archiveList.Count) {
                 if ($script:cancelRequested -or $form.IsDisposed) { break }
                 $arch = $script:archiveList[$i]
@@ -901,6 +959,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                 $lvItem.SubItems.Add($(TR('statusProcessing'))) | Out-Null
                 $lvItem.SubItems[1].ForeColor = [System.Drawing.Color]::DimGray
                 [void]$script:statusLV.Items.Add($lvItem)
+                $fileStart = [DateTime]::UtcNow
                 foreach ($pw in $passwords) {
                     if ($ok -or $script:cancelRequested -or $form.IsDisposed) { break }
                     Add-Log ((TR('tryPw')) -f $pw) 'Black'
@@ -942,18 +1001,21 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                                 $realPct = [int]$m[$m.Count - 1].Groups[1].Value
                                 if ($realPct -lt 0 -or $realPct -gt 100) { $realPct = 0 }
                             }
+                            # 目前檔案進度：7z 有報真實值就用真實值；沒報就用時間曲線平滑遞增（永遠在動、不會提前滿）
                             if ($realPct -gt 0) {
-                                $target = (($i + $realPct / 100.0) * 100) / $total
+                                $filePct = $realPct
                             } else {
-                                $base = ($i * 100.0) / $total
-                                $target = [Math]::Min($base + 80.0 / $total, (($i + 1) * 100.0) / $total - 5)
-                                if ($target -lt $base) { $target = $base + 1 }
+                                $ft = ([DateTime]::UtcNow - $fileStart).TotalSeconds
+                                $filePct = [int](100 * (1 - [Math]::Pow(0.88, $ft)))
+                                if ($filePct -gt 98) { $filePct = 98 }
+                                if ($filePct -lt 0) { $filePct = 0 }
                             }
-                            $displayOverall += [Math]::Max(0.8, ($target - $displayOverall) * 0.25)
-                            $displayOverall = [Math]::Max(0, [Math]::Min(100, $displayOverall))
-                            $script:progressBar.Value = [int]$displayOverall
+                            # 綠色進度條 = 整個待解壓清單的整體進度（已完成檔數 + 目前檔案進度）
+                            $overall = ($done * 100.0 + $filePct) / $total
+                            $script:progressBar.Value = [int][Math]::Min(100, [Math]::Max(0, $overall))
                             $elapsed = [int](([DateTime]::UtcNow - $startTime).TotalSeconds)
-                            $script:statusLabel.Text = ((TR('extracting')) -f $name, ($i + 1), $total, [int]$displayOverall, $elapsed)
+                            # 狀態列的百分比 = 目前正在解壓的那個檔案的進度
+                            $script:statusLabel.Text = ((TR('extracting')) -f $name, ($done + 1), $total, $filePct, $elapsed)
                         }
                         $rt.Wait(); $et.Wait()
                         $outFs.Dispose(); $errFs.Dispose()
@@ -974,16 +1036,9 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     Set-Status $lvItem (TR('cancelled')) 'DimGray'
                     break
                 }
-                # 滑到該檔完成位置
-                $target = (($i + 1) * 100.0) / $total
-                while ($displayOverall -lt $target -and $displayOverall -lt 100) {
-                    if ($script:cancelRequested -or $form.IsDisposed) { break }
-                    $displayOverall += [Math]::Max(1, ($target - $displayOverall) * 0.3)
-                    $displayOverall = [Math]::Min(100, $displayOverall)
-                    $script:progressBar.Value = [int]$displayOverall
-                    [System.Windows.Forms.Application]::DoEvents()
-                    Start-Sleep -Milliseconds 30
-                }
+                # 該檔完成 → 進度條直接跳到該檔應有的位置（不假裝平滑）
+                $script:progressBar.Value = [int]((($done + 1) * 100.0) / $total)
+                [System.Windows.Forms.Application]::DoEvents()
                 if ($ok) {
                     Set-Status $lvItem (TR('done')) 'Green'
                     if ($mode -eq 3) {
@@ -1009,6 +1064,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                 # 處理完畢 → 從待解壓清單移除（i 不遞增，下一個檔會補到這個位置）
                 $script:listBox.Items.RemoveAt($i)
                 $script:archiveList.RemoveAt($i)
+                $done++
             }
             if ($script:cancelRequested -or $form.IsDisposed) {
                 if (-not $form.IsDisposed) {
