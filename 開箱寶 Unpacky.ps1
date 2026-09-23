@@ -79,6 +79,7 @@ $script:UI = @{
         processing = '處理中...'
         fileLog = '[檔案] {0}'
         statusProcessing = '處理中…'
+        okNoPw = '  ✔ [成功] 無密碼（直接解壓成功）'
         tryPw = '  嘗試密碼: {0}'
         extracting = '解壓中: {0} ({1}/{2})  {3}%  (已用 {4} 秒)'
         okPw = '  ✔ [成功] 密碼: {0}'
@@ -156,6 +157,7 @@ $script:UI = @{
         processing = '处理中...'
         fileLog = '[文件] {0}'
         statusProcessing = '处理中…'
+        okNoPw = '  ✔ [成功] 无密码（直接解压成功）'
         tryPw = '  尝试密码: {0}'
         extracting = '解压中: {0} ({1}/{2})  {3}%  (已用 {4} 秒)'
         okPw = '  ✔ [成功] 密码: {0}'
@@ -233,6 +235,7 @@ $script:UI = @{
         processing = 'Processing...'
         fileLog = '[File] {0}'
         statusProcessing = 'Processing…'
+        okNoPw = '  ✔ [OK] extracted without password'
         tryPw = '  trying password: {0}'
         extracting = 'Extracting: {0} ({1}/{2})  {3}%  ({4}s elapsed)'
         okPw = '  ✔ [OK] password: {0}'
@@ -922,11 +925,8 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
             [void][System.Windows.Forms.MessageBox]::Show($(TR('needArch')), $(TR('hintTitle')))
             return
         }
+        # 密碼本可為空：程式會先直接嘗試無密碼解壓，有密碼的壓縮包才逐個試密碼
         $passwords = @($script:pwBox.Lines | Where-Object { $_.Trim() -ne '' })
-        if ($passwords.Count -eq 0) {
-            [void][System.Windows.Forms.MessageBox]::Show($(TR('needPw')), $(TR('hintTitle')))
-            return
-        }
         if ($script:radio3.Checked) { $mode = 3 } elseif ($script:radio2.Checked) { $mode = 2 } else { $mode = 1 }
 
         $script:cancelRequested = $false
@@ -959,10 +959,8 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                 $lvItem.SubItems.Add($(TR('statusProcessing'))) | Out-Null
                 $lvItem.SubItems[1].ForeColor = [System.Drawing.Color]::DimGray
                 [void]$script:statusLV.Items.Add($lvItem)
-                $fileStart = [DateTime]::UtcNow
-                foreach ($pw in $passwords) {
-                    if ($ok -or $script:cancelRequested -or $form.IsDisposed) { break }
-                    Add-Log ((TR('tryPw')) -f $pw) 'Black'
+                # 單次解壓嘗試（$pw 為空字串 = 不帶 -p，直接無密碼解壓；7z 成功回傳 exit 0）
+                function Invoke-OneExtract([string]$arch, [string]$outDir, [string]$pw, [string]$name) {
                     $proc = $null
                     $tmpOut = ''
                     $tmpErr = ''
@@ -975,11 +973,16 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                         $psi.CreateNoWindow = $true
                         $psi.RedirectStandardOutput = $true
                         $psi.RedirectStandardError = $true
-                        $argParts = @('x', '-y', '-bsp1', "-p$pw", $arch)
+                        # 關閉 stdin：無密碼嘗試時 7z 不會卡在「等待輸入密碼」
+                        $psi.RedirectStandardInput = $true
+                        $argParts = @('x', '-y', '-bsp1')
+                        if ($pw) { $argParts += "-p$pw" }
+                        $argParts += $arch
                         $psi.Arguments = (($argParts | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join ' ')
                         $tmpOut = [IO.Path]::GetTempFileName()
                         $tmpErr = [IO.Path]::GetTempFileName()
                         $proc = [System.Diagnostics.Process]::Start($psi)
+                        try { $proc.StandardInput.Close() } catch {}
                         $script:currentProc = $proc
                         $outFs = New-Object IO.FileStream($tmpOut, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
                         $errFs = New-Object IO.FileStream($tmpErr, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
@@ -987,10 +990,11 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                         $et = $proc.StandardError.BaseStream.CopyToAsync($errFs)
 
                         $realPct = 0
+                        $tryStart = [DateTime]::UtcNow
                         while (-not $proc.HasExited) {
                             $proc.Refresh()
                             Start-Sleep -Milliseconds 120
-                            [System.Windows.Forms.Application]::DoEvents()
+                            [void][System.Windows.Forms.Application]::DoEvents()
                             if ($script:cancelRequested -or $form.IsDisposed) {
                                 try { if (-not $proc.HasExited) { $proc.Kill() } } catch {}
                                 break
@@ -1005,7 +1009,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                             if ($realPct -gt 0) {
                                 $filePct = $realPct
                             } else {
-                                $ft = ([DateTime]::UtcNow - $fileStart).TotalSeconds
+                                $ft = ([DateTime]::UtcNow - $tryStart).TotalSeconds
                                 $filePct = [int](100 * (1 - [Math]::Pow(0.88, $ft)))
                                 if ($filePct -gt 98) { $filePct = 98 }
                                 if ($filePct -lt 0) { $filePct = 0 }
@@ -1026,10 +1030,24 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     } finally {
                         if ($tmpOut) { Remove-Item $tmpOut, $tmpErr -Force -ErrorAction SilentlyContinue }
                     }
-                    if ($script:cancelRequested -or $form.IsDisposed) { break }
-                    if ($exitCode -eq 0) {
-                        $ok = $true
-                        Add-Log ((TR('okPw')) -f $pw) 'Green'
+                    return $exitCode
+                }
+                # ① 先直接嘗試無密碼解壓：沒密碼的壓縮包直接成功，不再白試一整輪密碼
+                $firstExit = Invoke-OneExtract $arch $outDir '' $name
+                if ($firstExit -eq 0) {
+                    $ok = $true
+                    Add-Log (TR('okNoPw')) 'Green'
+                } else {
+                    # ② 有密碼 → 才一個一個嘗試密碼清單
+                    foreach ($pw in $passwords) {
+                        if ($ok -or $script:cancelRequested -or $form.IsDisposed) { break }
+                        Add-Log ((TR('tryPw')) -f $pw) 'Black'
+                        $exitCode = Invoke-OneExtract $arch $outDir $pw $name
+                        if ($script:cancelRequested -or $form.IsDisposed) { break }
+                        if ($exitCode -eq 0) {
+                            $ok = $true
+                            Add-Log ((TR('okPw')) -f $pw) 'Green'
+                        }
                     }
                 }
                 if ($script:cancelRequested -or $form.IsDisposed) {
@@ -1135,7 +1153,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     AT-Log 'step2: 建立測試檔'
                     $txt = Join-Path $tDir 'testfile.txt'
                     [IO.File]::WriteAllText($txt, 'hello autotest', (New-Object System.Text.UTF8Encoding($false)))
-                    AT-Log 'step3: 用7z建立加密壓縮包'
+                    AT-Log 'step3: 用7z建立加密壓縮包與無密碼壓縮包'
                     $arch = Join-Path $tDir '古風test.7z'
                     $p = New-Object System.Diagnostics.Process
                     $p.StartInfo.FileName = $script:SZ
@@ -1144,10 +1162,21 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     $p.StartInfo.CreateNoWindow = $true
                     [void]$p.Start()
                     $p.WaitForExit()
-                    if ($p.ExitCode -ne 0) { throw ('7z 建立測試檔失敗 code=' + $p.ExitCode) }
+                    if ($p.ExitCode -ne 0) { throw ('7z 建立加密檔失敗 code=' + $p.ExitCode) }
+                    $arch2 = Join-Path $tDir 'nopass.zip'
+                    $p2 = New-Object System.Diagnostics.Process
+                    $p2.StartInfo.FileName = $script:SZ
+                    $p2.StartInfo.Arguments = ('a -y "' + $arch2 + '" "' + $txt + '"')
+                    $p2.StartInfo.UseShellExecute = $false
+                    $p2.StartInfo.CreateNoWindow = $true
+                    [void]$p2.Start()
+                    $p2.WaitForExit()
+                    if ($p2.ExitCode -ne 0) { throw ('7z 建立無密碼檔失敗 code=' + $p2.ExitCode) }
                     AT-Log 'step4: 加入清單並開始解壓'
                     $script:archiveList.Add([IO.Path]::GetFullPath($arch))
                     [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch))
+                    $script:archiveList.Add([IO.Path]::GetFullPath($arch2))
+                    [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch2))
                     $script:pwBox.Text = 'PASS456'
                     $script:radio2.Checked = $true
                     Start-Extract
