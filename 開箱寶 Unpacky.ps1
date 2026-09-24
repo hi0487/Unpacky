@@ -965,6 +965,7 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     $tmpOut = ''
                     $tmpErr = ''
                     $exitCode = 1
+                    $errText = ''
                     try {
                         $psi = New-Object System.Diagnostics.ProcessStartInfo
                         $psi.FileName = $script:SZ
@@ -976,7 +977,8 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                         # 關閉 stdin：無密碼嘗試時 7z 不會卡在「等待輸入密碼」
                         $psi.RedirectStandardInput = $true
                         $argParts = @('x', '-y', '-bsp1')
-                        if ($pw) { $argParts += "-p$pw" }
+                        # 有密碼 → -p<密碼>；無密碼 → -p-（7z 明確「無密碼」，不會卡在等待輸入，也不會誤報 Break signaled）
+                        if ($pw) { $argParts += "-p$pw" } else { $argParts += '-p-' }
                         $argParts += $arch
                         $psi.Arguments = (($argParts | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join ' ')
                         $tmpOut = [IO.Path]::GetTempFileName()
@@ -1024,27 +1026,33 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                         $rt.Wait(); $et.Wait()
                         $outFs.Dispose(); $errFs.Dispose()
                         $exitCode = $proc.ExitCode
+                        # 讀取 7z 最後完整輸出：成功時一定有「Everything is Ok」（exit 0/1 都算完成）
+                        $outText = Read-TextShared $tmpOut
+                        $okNow = ($exitCode -eq 0 -or $exitCode -eq 1 -or ($outText -match 'Everything is Ok'))
+                        if (Test-Path -LiteralPath $tmpErr) { $errText = Read-TextShared $tmpErr }
                     } catch {
                         $exitCode = 1
+                        $okNow = $false
                         if ($proc) { try { $proc.Kill() } catch {} }
                     } finally {
                         if ($tmpOut) { Remove-Item $tmpOut, $tmpErr -Force -ErrorAction SilentlyContinue }
                     }
-                    return $exitCode
+                    return [PSCustomObject]@{ Exit = $exitCode; Ok = $okNow; Err = $errText }
                 }
-                # ① 先直接嘗試無密碼解壓：沒密碼的壓縮包直接成功，不再白試一整輪密碼
-                $firstExit = Invoke-OneExtract $arch $outDir '' $name
-                if ($firstExit -eq 0) {
+                # ① 先直接嘗試無密碼解壓（-p-）：沒密碼的壓縮包直接成功，不再白試一整輪密碼
+                $first = Invoke-OneExtract $arch $outDir '' $name
+                # 成功判據：7z 回報完成（exit 0/1 或輸出含「Everything is Ok」）
+                if ($first.Ok) {
                     $ok = $true
                     Add-Log (TR('okNoPw')) 'Green'
                 } else {
-                    # ② 有密碼 → 才一個一個嘗試密碼清單
+                    # ② 無密碼失敗（可能需要密碼）→ 才一個一個嘗試密碼清單
                     foreach ($pw in $passwords) {
                         if ($ok -or $script:cancelRequested -or $form.IsDisposed) { break }
                         Add-Log ((TR('tryPw')) -f $pw) 'Black'
-                        $exitCode = Invoke-OneExtract $arch $outDir $pw $name
+                        $res = Invoke-OneExtract $arch $outDir $pw $name
                         if ($script:cancelRequested -or $form.IsDisposed) { break }
-                        if ($exitCode -eq 0) {
+                        if ($res.Ok) {
                             $ok = $true
                             Add-Log ((TR('okPw')) -f $pw) 'Green'
                         }
@@ -1172,11 +1180,22 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     [void]$p2.Start()
                     $p2.WaitForExit()
                     if ($p2.ExitCode -ne 0) { throw ('7z 建立無密碼檔失敗 code=' + $p2.ExitCode) }
+                    $arch3 = Join-Path $tDir 'enczip.zip'
+                    $p3 = New-Object System.Diagnostics.Process
+                    $p3.StartInfo.FileName = $script:SZ
+                    $p3.StartInfo.Arguments = ('a -tzip -pPASS456 -mem=AES256 -y "' + $arch3 + '" "' + $txt + '"')
+                    $p3.StartInfo.UseShellExecute = $false
+                    $p3.StartInfo.CreateNoWindow = $true
+                    [void]$p3.Start()
+                    $p3.WaitForExit()
+                    if ($p3.ExitCode -ne 0) { throw ('7z 建立加密zip失敗 code=' + $p3.ExitCode) }
                     AT-Log 'step4: 加入清單並開始解壓'
                     $script:archiveList.Add([IO.Path]::GetFullPath($arch))
                     [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch))
                     $script:archiveList.Add([IO.Path]::GetFullPath($arch2))
                     [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch2))
+                    $script:archiveList.Add([IO.Path]::GetFullPath($arch3))
+                    [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch3))
                     $script:pwBox.Text = 'PASS456'
                     $script:radio2.Checked = $true
                     Start-Extract
