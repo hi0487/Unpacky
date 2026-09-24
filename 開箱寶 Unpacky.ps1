@@ -1,5 +1,5 @@
 ﻿# ============================================
-#  開箱寶 Unpacky.ps1 - 拖放式批量密碼解壓工具 V4
+#  開箱寶 Unpacky.ps1 - 拖放式批量密碼解壓工具 V5
 #  - 把壓縮包拖進視窗（或按「新增檔案」）
 #  - 輸入 / 載入密碼本（一行一個密碼）
 #  - 自動逐個試密碼，解壓到指定位置
@@ -28,7 +28,7 @@ Add-Type -AssemblyName System.Drawing
 $script:Lang = 'zh'
 $script:UI = @{
     zh = @{
-        title = '開箱寶 Unpacky V4'
+        title = '開箱寶 Unpacky V5'
         menuLang = 'Language語言'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
@@ -81,6 +81,8 @@ $script:UI = @{
         statusProcessing = '處理中…'
         okNoPw = '  ✔ [成功] 無密碼（直接解壓成功）'
         tryPw = '  嘗試密碼: {0}'
+        volSkip = '  ⏭ [跳過] {0}：分割檔後續，已由 {1} 涵蓋'
+        statusSkipped = '⏭ 跳過'
         extracting = '解壓中: {0} ({1}/{2})  {3}%  (已用 {4} 秒)'
         okPw = '  ✔ [成功] 密碼: {0}'
         cancelled = '已取消'
@@ -102,11 +104,11 @@ $script:UI = @{
         disclaimerTitle = '免責聲明'
         disclaimer = "本軟體免費且開源。如果有人向你收費，請拒絕付款；已付款請申請退款，並前往 GitHub 下載最新官方版本。`r`n`r`n本軟體僅供個人使用，用於學習 PowerShell 程式設計與自動化解壓縮。請勿用於任何營利或商業用途。`r`n`r`n請僅使用於你擁有合法權限解壓的檔案，尊重檔案所有人的權益。"
         aboutOk = '知道了'
-        aboutVersion = '目前版本：V4'
+        aboutVersion = '目前版本：V5'
         aboutGithub = 'GitHub 下載'
     }
     zhcn = @{
-        title = '开箱宝 Unpacky V4'
+        title = '开箱宝 Unpacky V5'
         menuLang = 'Language语言'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
@@ -159,6 +161,8 @@ $script:UI = @{
         statusProcessing = '处理中…'
         okNoPw = '  ✔ [成功] 无密码（直接解压成功）'
         tryPw = '  尝试密码: {0}'
+        volSkip = '  ⏭ [跳过] {0}：分卷后续，已由 {1} 涵盖'
+        statusSkipped = '⏭ 跳过'
         extracting = '解压中: {0} ({1}/{2})  {3}%  (已用 {4} 秒)'
         okPw = '  ✔ [成功] 密码: {0}'
         cancelled = '已取消'
@@ -180,11 +184,11 @@ $script:UI = @{
         disclaimerTitle = '免责声明'
         disclaimer = "本软件免费且开源。如果有人向你收费，请拒绝付款；已付款请申请退款，并前往 GitHub 下载最新官方版本。`r`n`r`n本软件仅供个人使用，用于学习 PowerShell 程序设计及自动化解压缩。请勿用于任何营利或商业用途。`r`n`r`n请仅用于你拥有合法权限解压的文件，尊重文件所有者的权益。"
         aboutOk = '知道了'
-        aboutVersion = '目前版本：V4'
+        aboutVersion = '目前版本：V5'
         aboutGithub = 'GitHub 下载'
     }
     en = @{
-        title = 'Unpacky V4'
+        title = 'Unpacky V5'
         menuLang = 'Language'
         menuZh = '繁體中文'
         menuZhcn = '简体中文'
@@ -237,6 +241,8 @@ $script:UI = @{
         statusProcessing = 'Processing…'
         okNoPw = '  ✔ [OK] extracted without password'
         tryPw = '  trying password: {0}'
+        volSkip = '  ⏭ [skipped] {0}: split-volume continuation, covered by {1}'
+        statusSkipped = '⏭ skipped'
         extracting = 'Extracting: {0} ({1}/{2})  {3}%  ({4}s elapsed)'
         okPw = '  ✔ [OK] password: {0}'
         cancelled = 'Cancelled'
@@ -258,7 +264,7 @@ $script:UI = @{
         disclaimerTitle = 'Disclaimer'
         disclaimer = "This software is free and open source. If anyone charges you for it, refuse to pay; if you already paid, request a refund, and download the latest official version from GitHub.`r`n`r`nThis software is for personal use only, for learning PowerShell scripting and automated archive extraction. Do not use it for any commercial or profit-making purpose.`r`n`r`nUse it only on archives you have the legal right to extract, and respect the rights of the archive owners."
         aboutOk = 'OK'
-        aboutVersion = 'Current version: V4'
+        aboutVersion = 'Current version: V5'
         aboutGithub = 'GitHub Download'
     }
 }
@@ -367,6 +373,37 @@ try {
     }
 
     # --- 更新各檔狀態（用 ListViewItem 物件直接更新 + 強制重繪）---
+    function Remove-RelatedVolumes([string]$firstArch) {
+        # 分割檔第一個解壓成功後，順帶刪除同組後續分割檔（.001 → .002+ / .r00 → .r01+ / .part1 → .part2+ / .zip → .z01+）
+        $dir = [IO.Path]::GetDirectoryName($firstArch)
+        $ext = [IO.Path]::GetExtension($firstArch)
+        try {
+            if ($ext -match '^\.(\d{3,})$') {
+                $base = [IO.Path]::GetFileNameWithoutExtension($firstArch)
+                for ($n = 2; $n -le 999; $n++) {
+                    $f = Join-Path $dir ($base + '.' + $n.ToString('D3'))
+                    if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+                }
+            } elseif ($ext -match '^\.r(\d{2,})$') {
+                $base = [IO.Path]::GetFileNameWithoutExtension($firstArch)
+                for ($n = 1; $n -le 99; $n++) {
+                    $f = Join-Path $dir ($base + '.r' + $n.ToString('D2'))
+                    if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+                }
+            } elseif ($firstArch -match '\.part(\d+)\.') {
+                for ($n = [int]$Matches[1] + 1; $n -le 999; $n++) {
+                    $f = $firstArch -replace '\.part\d+\.', ('.part' + $n + '.')
+                    if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+                }
+            } elseif ($ext -eq '.zip' -or $ext -match '^\.z(\d{2,})$') {
+                $base = [IO.Path]::GetFileNameWithoutExtension($firstArch)
+                for ($n = 1; $n -le 99; $n++) {
+                    $f = Join-Path $dir ($base + '.z' + $n.ToString('D2'))
+                    if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+                }
+            }
+        } catch {}
+    }
     function Set-Status($itemObj, [string]$text, [string]$color) {
         if ($itemObj -and $itemObj.SubItems.Count -gt 1) {
             $sub = $itemObj.SubItems[1]
@@ -959,6 +996,36 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                 $lvItem.SubItems.Add($(TR('statusProcessing'))) | Out-Null
                 $lvItem.SubItems[1].ForeColor = [System.Drawing.Color]::DimGray
                 [void]$script:statusLV.Items.Add($lvItem)
+                # 偵測分割檔後續 volume（.002+ / .r01+ / .z01+ / .part2+）→ 跳過，由第一個涵蓋
+                $skipVol = $false
+                $volNote = ''
+                $fileExt = [IO.Path]::GetExtension($arch)
+                if ($fileExt -match '^\.(\d{3,})$') {
+                    $volNum = [int]$fileExt.Substring(1)
+                    if ($volNum -gt 1) {
+                        $skipVol = $true
+                        $volNote = ((TR('volSkip')) -f $name, ([IO.Path]::ChangeExtension($arch, '.001')))
+                    }
+                } elseif ($fileExt -match '^\.r(\d{2,})$') {
+                    if ([int]$fileExt.Substring(2) -gt 0) {
+                        $skipVol = $true
+                        $volNote = ((TR('volSkip')) -f $name, ([IO.Path]::ChangeExtension($arch, '.r00')))
+                    }
+                } elseif ($fileExt -match '^\.z(\d{2,})$') {
+                    $skipVol = $true
+                    $volNote = ((TR('volSkip')) -f $name, ([IO.Path]::ChangeExtension($arch, '.zip')))
+                } elseif ($arch -match '\.part\d+\.' -and $arch -notmatch '\.part1\.') {
+                    $skipVol = $true
+                    $volNote = ((TR('volSkip')) -f $name, ($arch -replace '\.part\d+\.', '.part1.'))
+                }
+                if ($skipVol) {
+                    Add-Log $volNote 'Orange'
+                    Set-Status $lvItem (TR('statusSkipped')) 'Orange'
+                    $script:listBox.Items.RemoveAt($i)
+                    $script:archiveList.RemoveAt($i)
+                    $done++
+                    continue
+                }
                 # 單次解壓嘗試（$pw 為空字串 = 不帶 -p，直接無密碼解壓；7z 成功回傳 exit 0）
                 function Invoke-OneExtract([string]$arch, [string]$outDir, [string]$pw, [string]$name) {
                     $proc = $null
@@ -967,6 +1034,8 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     $exitCode = 1
                     $errText = ''
                     try {
+                        # 解壓前拍照：記錄輸出資料夾原本有哪些檔案（判斷 7z 是否真的解出新檔案）
+                        $beforeSet = @(Get-ChildItem -LiteralPath $outDir -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName.ToLowerInvariant() })
                         $psi = New-Object System.Diagnostics.ProcessStartInfo
                         $psi.FileName = $script:SZ
                         $psi.WorkingDirectory = $outDir
@@ -1028,7 +1097,9 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                         $exitCode = $proc.ExitCode
                         # 讀取 7z 最後完整輸出：成功時一定有「Everything is Ok」（exit 0/1 都算完成）
                         $outText = Read-TextShared $tmpOut
-                        $okNow = ($exitCode -eq 0 -or $exitCode -eq 1 -or ($outText -match 'Everything is Ok'))
+                        # 額外判據：輸出資料夾出現「非空」新檔案也視為成功（有些分割檔 7z 解壓成功但 exit code 非 0）
+                        $afterSet = @(Get-ChildItem -LiteralPath $outDir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 -and $_.FullName.ToLowerInvariant() -notin $beforeSet })
+                        $okNow = ($exitCode -eq 0 -or $exitCode -eq 1 -or ($outText -match 'Everything is Ok') -or $afterSet.Count -gt 0)
                         if (Test-Path -LiteralPath $tmpErr) { $errText = Read-TextShared $tmpErr }
                     } catch {
                         $exitCode = 1
@@ -1079,6 +1150,8 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                         }
                         if ($deleted) {
                             Add-Log (TR('deleted')) 'Orange'
+                            # 分割檔：主檔刪除後順帶刪除同組後續 volume（.002+ / .r01+ 等，跳過的那些）
+                            Remove-RelatedVolumes $arch
                         } else {
                             Add-Log ((TR('delFail')) -f $name) 'Red'
                         }
@@ -1189,6 +1262,20 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     [void]$p3.Start()
                     $p3.WaitForExit()
                     if ($p3.ExitCode -ne 0) { throw ('7z 建立加密zip失敗 code=' + $p3.ExitCode) }
+                    # 分割檔測試：300KB 檔 → -v100k 分割成 .001/.002/.003/.004
+                    $splitBin = Join-Path $tDir 'split.bin'
+                    $bigData = New-Object byte[] (300 * 1024)
+                    [System.Random]::new().NextBytes($bigData)
+                    [IO.File]::WriteAllBytes($splitBin, $bigData)
+                    $splitArch = Join-Path $tDir 'split.7z'
+                    $p4 = New-Object System.Diagnostics.Process
+                    $p4.StartInfo.FileName = $script:SZ
+                    $p4.StartInfo.Arguments = ('a -v100k -y "' + $splitArch + '" "' + $splitBin + '"')
+                    $p4.StartInfo.UseShellExecute = $false
+                    $p4.StartInfo.CreateNoWindow = $true
+                    [void]$p4.Start()
+                    $p4.WaitForExit()
+                    if ($p4.ExitCode -ne 0) { throw ('7z 建立分割檔失敗 code=' + $p4.ExitCode) }
                     AT-Log 'step4: 加入清單並開始解壓'
                     $script:archiveList.Add([IO.Path]::GetFullPath($arch))
                     [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch))
@@ -1196,14 +1283,21 @@ public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, In
                     [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch2))
                     $script:archiveList.Add([IO.Path]::GetFullPath($arch3))
                     [void]$script:listBox.Items.Add([IO.Path]::GetFileName($arch3))
+                    # 分割檔：.001 與 .002 一起拖入（.002 應被跳過）
+                    $script:archiveList.Add([IO.Path]::GetFullPath($splitArch + '.001'))
+                    [void]$script:listBox.Items.Add([IO.Path]::GetFileName($splitArch + '.001'))
+                    $script:archiveList.Add([IO.Path]::GetFullPath($splitArch + '.002'))
+                    [void]$script:listBox.Items.Add([IO.Path]::GetFileName($splitArch + '.002'))
                     $script:pwBox.Text = 'PASS456'
-                    $script:radio2.Checked = $true
+                    $script:radio3.Checked = $true
                     Start-Extract
                     AT-Log 'step5: 讀取狀態'
+                    $splitGone = (-not (Test-Path -LiteralPath ($splitArch + '.001'))) -and (-not (Test-Path -LiteralPath ($splitArch + '.002')))
+                    AT-Log ('SPLITGONE=' + $splitGone)
                     $rows = @($script:statusLV.Items | ForEach-Object { $_.SubItems[1].Text })
                     AT-Log ('ROWS=' + ($rows -join '|'))
                     $logText = $script:logBox.Text -replace "`r?`n", ' / '
-                    [IO.File]::WriteAllText($atResult, ('ROWS=' + ($rows -join '|') + "`nLOGBOX=" + $logText), (New-Object System.Text.UTF8Encoding($true)))
+                    [IO.File]::WriteAllText($atResult, ('ROWS=' + ($rows -join '|') + "`nLOGBOX=" + $logText + "`nSPLITGONE=" + $splitGone), (New-Object System.Text.UTF8Encoding($true)))
                     AT-Log 'step6: 完成'
                 } catch {
                     AT-Log ('ERR:' + $_.Exception.Message)
